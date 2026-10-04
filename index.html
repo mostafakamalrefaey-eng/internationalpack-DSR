@@ -329,7 +329,7 @@
     <div class="app-credit">
       <div class="app-credit-name">DSR</div>
       <div class="app-credit-by">Edit By Mostafa Refaey</div>
-      <div class="app-credit-by" style="margin-top:2px;">النسخة: v9</div>
+      <div class="app-credit-by" style="margin-top:2px;">النسخة: v10</div>
     </div>
   </div>
 </div>
@@ -1156,7 +1156,8 @@ async function addRep(){
   if(DB.reps.some(r=>r.username===username)){ showToast('اسم المستخدم موجود بالفعل'); return; }
 
   DB.reps.push({ id: uid('rep'), name, username, password });
-  await saveDB();
+  const ok = await saveDBNow();
+  if(!ok){ showToast('تعذر حفظ المندوب، تحقق من الإنترنت وحاول تاني'); renderAdmin(); return; }
   document.getElementById('rep-name').value='';
   document.getElementById('rep-username').value='';
   document.getElementById('rep-password').value='';
@@ -1168,8 +1169,8 @@ async function removeRep(repId){
   if(!confirm('هل تريد حذف هذا المندوب؟ سيتم إلغاء توزيع عملائه.')) return;
   DB.reps = DB.reps.filter(r=>r.id!==repId);
   DB.leads.forEach(l=>{ if(l.repId===repId) l.repId=null; });
-  await saveDB();
-  showToast('تم حذف المندوب');
+  const ok = await saveDBNow();
+  showToast(ok ? 'تم حذف المندوب' : 'تعذر حفظ الحذف، تحقق من الإنترنت');
   renderAdmin();
 }
 
