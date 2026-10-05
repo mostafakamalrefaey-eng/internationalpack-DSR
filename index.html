@@ -312,6 +312,7 @@
     <div class="role-tabs">
       <div class="role-tab active" id="tab-admin" onclick="switchRoleTab('admin')">مدير النظام</div>
       <div class="role-tab" id="tab-rep" onclick="switchRoleTab('rep')">مندوب مبيعات</div>
+      <div class="role-tab" id="tab-entry" onclick="switchRoleTab('data_entry')">مدخل بيانات</div>
     </div>
 
     <div class="login-error" id="login-error"></div>
@@ -329,7 +330,7 @@
     <div class="app-credit">
       <div class="app-credit-name">DSR</div>
       <div class="app-credit-by">Edit By Mostafa Refaey</div>
-      <div class="app-credit-by" style="margin-top:2px;">النسخة: v10</div>
+      <div class="app-credit-by" style="margin-top:2px;">النسخة: v12</div>
     </div>
   </div>
 </div>
@@ -368,6 +369,7 @@
         <button class="tab-btn active" onclick="switchAdminTab('leads')" data-tab="leads">كل العملاء</button>
         <button class="tab-btn" onclick="switchAdminTab('add')" data-tab="add">إضافة بيانات</button>
         <button class="tab-btn" onclick="switchAdminTab('reps')" data-tab="reps">المناديب</button>
+        <button class="tab-btn" onclick="switchAdminTab('entry')" data-tab="entry">مدخلو البيانات</button>
         <button class="tab-btn" onclick="switchAdminTab('notes')" data-tab="notes">ملاحظات المناديب</button>
         <button class="tab-btn" onclick="switchAdminTab('backup')" data-tab="backup">النسخ الاحتياطي</button>
       </div>
@@ -458,6 +460,24 @@
         </div>
       </div>
 
+      <!-- Data entry users -->
+      <div class="panel" id="admin-panel-entry">
+        <div class="card">
+          <h3>إضافة مدخل بيانات</h3>
+          <div class="sub">موظف شغله الوحيد إضافة عملاء جدد (يدوي أو إكسل)، ومش بيشوف جدول العملاء ولا المناديب ولا أي بيانات تانية</div>
+          <div class="grid-2" style="margin-bottom:14px;">
+            <div class="field"><label>اسم الموظف</label><input id="entry-name" placeholder="مثال: سارة أحمد"></div>
+            <div class="field"><label>اسم المستخدم</label><input id="entry-username" placeholder="sara.a"></div>
+          </div>
+          <div class="field" style="max-width:280px;"><label>كلمة المرور</label><input id="entry-password" type="text" placeholder="كلمة مرور بسيطة"></div>
+          <button class="btn btn-teal" onclick="addDataEntryUser()">+ إضافة مدخل بيانات</button>
+        </div>
+        <div class="card">
+          <h3>مدخلو البيانات الحاليين</h3>
+          <div id="entry-users-list"></div>
+        </div>
+      </div>
+
       <!-- Reps' notes -->
       <div class="panel" id="admin-panel-notes">
         <div class="card">
@@ -511,6 +531,46 @@
         </div>
         <div id="rep-leads-wrap"></div>
         <div id="rep-pager" class="pager"></div>
+      </div>
+    </div>
+
+    <!-- ===== DATA ENTRY VIEW ===== -->
+    <div id="data-entry-view" class="hidden">
+      <div class="card">
+        <h3>إضافة عملاء جدد</h3>
+        <div class="sub">أضف عميل واحد بالنموذج، أو الصق عدة عملاء دفعة واحدة (سطر لكل عميل)</div>
+
+        <div class="grid-2" style="margin-bottom:18px;">
+          <div class="field"><label>اسم العميل</label><input id="de-add-name" placeholder="مثال: أحمد محمود"></div>
+          <div class="field"><label>رقم الهاتف</label><input id="de-add-phone" placeholder="01xxxxxxxxx"></div>
+        </div>
+        <div class="field"><label>ملاحظات إضافية (اختياري)</label><input id="de-add-note" placeholder="المدينة، مصدر العميل، المنتج المهتم به..."></div>
+        <button class="btn btn-teal" onclick="deAddSingleLead()">+ إضافة العميل</button>
+
+        <hr style="margin:24px 0;border:none;border-top:1px solid var(--sand-2);">
+
+        <h3>استيراد من ملف إكسل</h3>
+        <div class="sub">الملف لازم يكون فيه 3 أعمدة بالترتيب: <b>الاسم</b> — <b>الهاتف</b> — <b>ملاحظات</b></div>
+        <div class="toolbar" style="margin-bottom:0;">
+          <button class="btn btn-outline btn-sm" onclick="downloadTemplate()">⬇ تحميل نموذج إكسل فارغ</button>
+          <label class="btn btn-gold btn-sm" style="cursor:pointer;margin:0;">
+            📤 اختيار ملف إكسل (xlsx / xls / csv)
+            <input type="file" id="de-excel-file-input" accept=".xlsx,.xls,.csv" onchange="deHandleExcelFile(event)" style="display:none;">
+          </label>
+        </div>
+        <div id="de-import-preview" style="margin-top:14px;"></div>
+
+        <hr style="margin:24px 0;border:none;border-top:1px solid var(--sand-2);">
+
+        <details>
+          <summary style="cursor:pointer;font-weight:700;font-size:14px;color:#6b6350;">أو الصق بيانات نصياً بدل الإكسل</summary>
+          <div style="margin-top:14px;">
+            <div class="sub">كل سطر بالشكل: <span class="mono">الاسم, الهاتف, ملاحظة</span></div>
+            <textarea id="de-bulk-input" placeholder="أحمد محمود, 01012345678, القاهرة - فيسبوك
+سارة علي, 01198765432, اسكندرية - إحالة عميل"></textarea>
+            <button class="btn btn-teal" style="margin-top:12px;" onclick="deAddBulkLeads()">+ إضافة الدفعة</button>
+          </div>
+        </details>
       </div>
     </div>
 
@@ -574,6 +634,7 @@ async function loadAuthData(){
     if(data && data.admin){
       rawRepsFromServer = Array.isArray(data.reps) ? data.reps.slice() : [];
       data.reps = rawRepsFromServer.filter(r => r && r.id);
+      data.dataEntryUsers = (Array.isArray(data.dataEntryUsers) ? data.dataEntryUsers : []).filter(u => u && u.id);
       authData = data;
       dbConnected = true;
       updateConnBanner();
@@ -594,9 +655,10 @@ async function loadFullDB(){
     const res = await fetch(SCRIPT_URL + '?action=leads', { cache:'no-store' });
     const data = await res.json();
     const cleanReps = (authData.reps || []).filter(r => r && r.id);
+    const cleanEntryUsers = (authData.dataEntryUsers || []).filter(u => u && u.id);
     const cleanLeads = ((data && Array.isArray(data.leads)) ? data.leads : []).filter(l => l && l.id);
     cleanLeads.forEach(l => { if(!Array.isArray(l.history)) l.history = []; });
-    DB = { admin: authData.admin, reps: cleanReps, leads: cleanLeads };
+    DB = { admin: authData.admin, reps: cleanReps, dataEntryUsers: cleanEntryUsers, leads: cleanLeads };
     dbConnected = true;
     updateConnBanner();
     return true;
@@ -712,6 +774,7 @@ function switchRoleTab(role){
   roleTab = role;
   document.getElementById('tab-admin').classList.toggle('active', role==='admin');
   document.getElementById('tab-rep').classList.toggle('active', role==='rep');
+  document.getElementById('tab-entry').classList.toggle('active', role==='data_entry');
   document.getElementById('login-error').style.display='none';
 }
 
@@ -732,24 +795,29 @@ async function doLogin(){
     return;
   }
 
-  let matchedSession = null;
-  if(roleTab === 'admin'){
-    if(u === authData.admin.username && p === authData.admin.password){
-      matchedSession = { role:'admin' };
+  function tryMatch(){
+    if(roleTab === 'admin'){
+      if(u === authData.admin.username && p === authData.admin.password) return { role:'admin' };
+      return null;
+    }else if(roleTab === 'rep'){
+      const rep = authData.reps.find(r => r.username === u && r.password === p);
+      return rep ? { role:'rep', repId: rep.id } : null;
     }else{
-      errBox.textContent = 'بيانات المدير غير صحيحة';
-      errBox.style.display='block';
-      return;
+      const entryUser = (authData.dataEntryUsers||[]).find(r => r.username === u && r.password === p);
+      return entryUser ? { role:'data_entry', entryId: entryUser.id } : null;
     }
-  }else{
-    const rep = authData.reps.find(r => r.username === u && r.password === p);
-    if(rep){
-      matchedSession = { role:'rep', repId: rep.id };
-    }else{
-      errBox.textContent = 'اسم المستخدم أو كلمة المرور غير صحيحة';
-      errBox.style.display='block';
-      return;
-    }
+  }
+
+  let matchedSession = tryMatch();
+  if(!matchedSession){
+    // ممكن البيانات اتغيرت على الخادم بعد ما اتحمّلت الصفحة (مثلاً حساب جديد اتضاف تو)، نجرب تحديثها مرة واحدة
+    await loadAuthData();
+    if(authData) matchedSession = tryMatch();
+  }
+  if(!matchedSession){
+    errBox.textContent = roleTab === 'admin' ? 'بيانات المدير غير صحيحة' : 'اسم المستخدم أو كلمة المرور غير صحيحة';
+    errBox.style.display='block';
+    return;
   }
 
   // اليوزر والباسورد صح، دلوقتي نجيب بيانات العملاء (الجزء التقيل)
@@ -787,6 +855,7 @@ function enterApp(){
   document.getElementById('app-screen').style.display='block';
   document.getElementById('admin-view').classList.add('hidden');
   document.getElementById('rep-view').classList.add('hidden');
+  document.getElementById('data-entry-view').classList.add('hidden');
   document.getElementById('change-pass-btn').classList.remove('hidden');
 
   if(session.role === 'admin'){
@@ -794,12 +863,17 @@ function enterApp(){
     document.getElementById('topbar-sub').textContent = 'لوحة المدير';
     document.getElementById('who-name').textContent = 'مدير النظام';
     renderAdmin();
-  }else{
+  }else if(session.role === 'rep'){
     document.getElementById('rep-view').classList.remove('hidden');
     const rep = DB.reps.find(r=>r.id===session.repId);
     document.getElementById('topbar-sub').textContent = 'لوحة المندوب';
     document.getElementById('who-name').textContent = rep ? rep.name : '';
     renderRep();
+  }else{
+    document.getElementById('data-entry-view').classList.remove('hidden');
+    const eu = DB.dataEntryUsers.find(u=>u.id===session.entryId);
+    document.getElementById('topbar-sub').textContent = 'إدخال بيانات';
+    document.getElementById('who-name').textContent = eu ? eu.name : '';
   }
 }
 
@@ -829,7 +903,7 @@ function renderAdmin(){
     filterRep.value = currentVal || 'all';
   }catch(e){ console.error(e); }
 
-  [renderAdminLeadsTable, renderRepsList, renderNotesPanel].forEach(fn=>{
+  [renderAdminLeadsTable, renderRepsList, renderEntryUsersList, renderNotesPanel].forEach(fn=>{
     try{ fn(); }catch(e){ console.error(fn.name, e); }
   });
 }
@@ -1174,6 +1248,150 @@ async function removeRep(repId){
   renderAdmin();
 }
 
+async function addDataEntryUser(){
+  const name = document.getElementById('entry-name').value.trim();
+  const username = document.getElementById('entry-username').value.trim();
+  const password = document.getElementById('entry-password').value.trim();
+  if(!name || !username || !password){ showToast('املأ كل الحقول'); return; }
+  if(DB.reps.some(r=>r.username===username) || DB.dataEntryUsers.some(u=>u.username===username) || username===DB.admin.username){
+    showToast('اسم المستخدم موجود بالفعل'); return;
+  }
+  DB.dataEntryUsers.push({ id: uid('entry'), name, username, password });
+  const ok = await saveDBNow();
+  if(!ok){ showToast('تعذر الحفظ، تحقق من الإنترنت وحاول تاني'); renderEntryUsersList(); return; }
+  document.getElementById('entry-name').value='';
+  document.getElementById('entry-username').value='';
+  document.getElementById('entry-password').value='';
+  showToast('تم إضافة مدخل البيانات ✓');
+  renderEntryUsersList();
+}
+
+async function removeDataEntryUser(entryId){
+  if(!confirm('هل تريد حذف مدخل البيانات ده؟')) return;
+  DB.dataEntryUsers = DB.dataEntryUsers.filter(u=>u.id!==entryId);
+  const ok = await saveDBNow();
+  showToast(ok ? 'تم الحذف' : 'تعذر حفظ الحذف، تحقق من الإنترنت');
+  renderEntryUsersList();
+}
+
+function renderEntryUsersList(){
+  const wrap = document.getElementById('entry-users-list');
+  if(!wrap) return;
+  if(DB.dataEntryUsers.length===0){
+    wrap.innerHTML = `<div class="empty-state"><div class="icon">⌨️</div><div class="msg">لسه مفيش مدخلي بيانات</div><div class="sub">أضف أول واحد من النموذج فوق</div></div>`;
+    return;
+  }
+  wrap.innerHTML = DB.dataEntryUsers.map(u=>`<div class="rep-card">
+      <div>
+        <div class="r-name">${escapeHtml(u.name)}</div>
+        <div class="r-user">${escapeHtml(u.username)} / ${escapeHtml(u.password)}</div>
+      </div>
+      <button class="btn btn-danger btn-sm" onclick="removeDataEntryUser('${u.id}')">حذف</button>
+    </div>`).join('');
+}
+
+/* ===================== DATA ENTRY: ADD LEADS ===================== */
+async function deAddSingleLead(){
+  const name = document.getElementById('de-add-name').value.trim();
+  const phone = document.getElementById('de-add-phone').value.trim();
+  const note = document.getElementById('de-add-note').value.trim();
+  if(!name || !phone){ showToast('اكتب اسم ورقم هاتف على الأقل'); return; }
+  const np = normPhone(phone);
+  const dup = np && DB.leads.find(l=>normPhone(l.phone)===np);
+  if(dup){ alert('⚠️ الرقم ده موجود بالفعل باسم: ' + dup.name); return; }
+
+  DB.leads.push(newLead(name, phone, note));
+  const ok = await saveDBNow();
+  if(!ok){ showToast('تعذر الحفظ، تحقق من الإنترنت وحاول تاني'); return; }
+  document.getElementById('de-add-name').value='';
+  document.getElementById('de-add-phone').value='';
+  document.getElementById('de-add-note').value='';
+  showToast('تم إضافة العميل ✓');
+}
+
+async function deAddBulkLeads(){
+  const raw = document.getElementById('de-bulk-input').value.trim();
+  if(!raw){ showToast('الصق بيانات العملاء أولاً'); return; }
+  const lines = raw.split('\n').map(l=>l.trim()).filter(Boolean);
+  let count = 0, dups = 0;
+  const seen = new Set(DB.leads.map(l=>normPhone(l.phone)));
+  lines.forEach(line=>{
+    const parts = line.split(',').map(p=>p.trim());
+    const name = parts[0] || '';
+    const phone = parts[1] || '';
+    const note = parts.slice(2).join(', ') || '';
+    if(name && phone){
+      const np = normPhone(phone);
+      if(np && seen.has(np)){ dups++; return; }
+      if(np) seen.add(np);
+      DB.leads.push(newLead(name, phone, note));
+      count++;
+    }
+  });
+  if(count===0){ showToast(dups ? `كل الأرقام دي موجودة بالفعل (${dups})` : 'مفيش سطور صحيحة (الاسم, الهاتف)'); return; }
+  const ok = await saveDBNow();
+  if(!ok){ showToast('تعذر الحفظ، تحقق من الإنترنت وحاول تاني'); return; }
+  document.getElementById('de-bulk-input').value='';
+  showToast(`تم إضافة ${count} عميل ✓${dups ? ` (تخطينا ${dups} مكرر)` : ''}`);
+}
+
+function deHandleExcelFile(evt){
+  const file = evt.target.files[0];
+  const preview = document.getElementById('de-import-preview');
+  if(!file) return;
+  preview.innerHTML = `<div class="sub">جاري القراءة...</div>`;
+  const reader = new FileReader();
+  reader.onload = function(e){
+    try{
+      const data = new Uint8Array(e.target.result);
+      const workbook = XLSX.read(data, { type:'array' });
+      const sheet = workbook.Sheets[workbook.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(sheet, { header:1, defval:'' });
+      deImportRowsToLeads(rows);
+    }catch(err){
+      preview.innerHTML = `<div class="login-error" style="display:block;">تعذر قراءة الملف، تأكد إنه ملف إكسل أو CSV سليم</div>`;
+    }
+    evt.target.value = '';
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+async function deImportRowsToLeads(rows){
+  const preview = document.getElementById('de-import-preview');
+  if(!rows || rows.length===0){ preview.innerHTML = `<div class="sub">الملف فاضي.</div>`; return; }
+  const headerWords = ['اسم','name','الاسم'];
+  let startIdx = 0;
+  const firstRowJoined = (rows[0]||[]).join(' ').toString().toLowerCase();
+  if(headerWords.some(h=>firstRowJoined.includes(h))) startIdx = 1;
+
+  let added = 0, skipped = 0, dups = 0;
+  const seen = new Set(DB.leads.map(l=>normPhone(l.phone)));
+  for(let i=startIdx; i<rows.length; i++){
+    const r = rows[i] || [];
+    const name = (r[0]||'').toString().trim();
+    const phone = (r[1]||'').toString().trim();
+    const note = (r[2]||'').toString().trim();
+    if(name && phone){
+      const np = normPhone(phone);
+      if(np && seen.has(np)){ dups++; continue; }
+      if(np) seen.add(np);
+      DB.leads.push(newLead(name, phone, note));
+      added++;
+    }else if(name || phone){ skipped++; }
+  }
+  if(added===0){
+    preview.innerHTML = `<div class="login-error" style="display:block;">${dups ? `كل الأرقام دي موجودة بالفعل (${dups} مكرر)` : 'مفيش صفوف صحيحة (لازم اسم + هاتف على الأقل في كل صف)'}</div>`;
+    return;
+  }
+  preview.innerHTML = `<div class="sub">جاري الحفظ...</div>`;
+  const ok = await saveDBNow();
+  if(!ok){ preview.innerHTML = `<div class="login-error" style="display:block;">تعذر الحفظ، تحقق من الإنترنت وحاول تاني</div>`; return; }
+  preview.innerHTML = `<div style="background:rgba(31,111,107,0.1);color:var(--teal);border-radius:8px;padding:10px 14px;font-size:13.5px;font-weight:700;">
+    تم استيراد ${added} عميل بنجاح ✓ ${skipped ? `(تخطينا ${skipped} صف ناقص بيانات)` : ''} ${dups ? `(تخطينا ${dups} رقم مكرر)` : ''}
+  </div>`;
+  showToast(`تم استيراد ${added} عميل من الإكسل ✓`);
+}
+
 async function assignLeadFromTable(leadId, repId){
   const lead = DB.leads.find(l=>l.id===leadId);
   if(!lead) return;
@@ -1228,8 +1446,9 @@ function flyCards(evt){
 
 /* ===================== CHANGE OWN PASSWORD (admin + rep) ===================== */
 async function changeOwnPassword(){
-  const isAdmin = session.role === 'admin';
-  const target = isAdmin ? DB.admin : DB.reps.find(r=>r.id===session.repId);
+  const target = session.role === 'admin' ? DB.admin
+    : session.role === 'rep' ? DB.reps.find(r=>r.id===session.repId)
+    : DB.dataEntryUsers.find(u=>u.id===session.entryId);
   if(!target) return;
   const oldPass = prompt('اكتب كلمة المرور الحالية للتأكيد:');
   if(oldPass === null) return;
