@@ -294,6 +294,7 @@
   .topbar{flex-wrap:wrap;gap:8px;}
   .topbar-right{flex-wrap:wrap;gap:8px;}
   @media(max-width:640px){ .topbar{padding:12px 14px;} .container{padding:16px;} }
+  .cell-note{max-width:260px;word-break:break-word;color:#6b6350;font-size:12.5px;}
 </style>
 </head>
 <body>
@@ -330,7 +331,7 @@
     <div class="app-credit">
       <div class="app-credit-name">DSR</div>
       <div class="app-credit-by">Edit By Mostafa Refaey</div>
-      <div class="app-credit-by" style="margin-top:2px;">النسخة: v12</div>
+      <div class="app-credit-by" style="margin-top:2px;">النسخة: v13</div>
     </div>
   </div>
 </div>
@@ -536,6 +537,12 @@
 
     <!-- ===== DATA ENTRY VIEW ===== -->
     <div id="data-entry-view" class="hidden">
+      <div class="tabs">
+        <button class="tab-btn active" onclick="switchEntryTab('add')" data-tab="add">إضافة بيانات</button>
+        <button class="tab-btn" onclick="switchEntryTab('leads')" data-tab="leads">العملاء (بحث وتعديل)</button>
+        <button class="tab-btn" onclick="switchEntryTab('notes')" data-tab="notes">ملاحظات المناديب</button>
+      </div>
+      <div class="panel active" id="de-panel-add">
       <div class="card">
         <h3>إضافة عملاء جدد</h3>
         <div class="sub">أضف عميل واحد بالنموذج، أو الصق عدة عملاء دفعة واحدة (سطر لكل عميل)</div>
@@ -572,6 +579,32 @@
           </div>
         </details>
       </div>
+      </div>
+
+      <div class="panel" id="de-panel-leads">
+        <div class="card">
+          <h3>العملاء</h3>
+          <div class="sub">دوّر على العميل بالاسم أو الرقم أو الملاحظة، وعدّل بياناته الناقصة</div>
+          <div class="toolbar">
+            <input class="search" id="de-search" placeholder="🔍 ابحث بالاسم أو الرقم أو الملاحظة" oninput="entrySearchChanged()">
+          </div>
+          <div id="de-leads-wrap"></div>
+          <div id="de-pager" class="pager"></div>
+        </div>
+      </div>
+
+      <div class="panel" id="de-panel-notes">
+        <div class="card">
+          <h3>ملاحظات المناديب</h3>
+          <div class="sub">كل الملاحظات اللي كتبها المناديب على عملائهم، الأحدث أولاً. دوس على أي ملاحظة لتعديل بيانات العميل</div>
+          <div class="toolbar">
+            <select id="de-notes-filter-rep" onchange="renderEntryNotes()">
+              <option value="all">كل المناديب</option>
+            </select>
+          </div>
+          <div id="de-notes-list"></div>
+        </div>
+      </div>
     </div>
 
   </div>
@@ -605,6 +638,23 @@
 
       <label style="font-size:12.5px;font-weight:700;color:#8a8168;display:block;margin:20px 0 4px;">سجل العميل (Timeline)</label>
       <div class="history-list" id="history-list"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ================= EDIT LEAD MODAL (مدخل البيانات) ================= -->
+<div class="modal-overlay" id="edit-lead-modal">
+  <div class="modal">
+    <div class="modal-head">
+      <div><h3>تعديل بيانات العميل</h3></div>
+      <button class="modal-close" onclick="closeEditLeadModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="field"><label>اسم العميل</label><input id="edit-name"></div>
+      <div class="field"><label>رقم الهاتف</label><input id="edit-phone"></div>
+      <div class="field"><label>ملاحظات</label><input id="edit-note"></div>
+      <button class="btn btn-teal" id="edit-save-btn" onclick="saveLeadEdit()">حفظ التعديلات</button>
+      <div id="edit-rep-notes" style="margin-top:18px;"></div>
     </div>
   </div>
 </div>
@@ -844,6 +894,7 @@ async function doLogin(){
 
 function doLogout(){
   session = null;
+  closeEditLeadModal();
   document.getElementById('app-screen').style.display='none';
   document.getElementById('login-screen').style.display='flex';
   document.getElementById('login-username').value='';
@@ -874,6 +925,8 @@ function enterApp(){
     const eu = DB.dataEntryUsers.find(u=>u.id===session.entryId);
     document.getElementById('topbar-sub').textContent = 'إدخال بيانات';
     document.getElementById('who-name').textContent = eu ? eu.name : '';
+    switchEntryTab('add');
+    renderDataEntry();
   }
 }
 
@@ -1307,6 +1360,7 @@ async function deAddSingleLead(){
   document.getElementById('de-add-phone').value='';
   document.getElementById('de-add-note').value='';
   showToast('تم إضافة العميل ✓');
+  renderEntryLeads();
 }
 
 async function deAddBulkLeads(){
@@ -1333,6 +1387,7 @@ async function deAddBulkLeads(){
   if(!ok){ showToast('تعذر الحفظ، تحقق من الإنترنت وحاول تاني'); return; }
   document.getElementById('de-bulk-input').value='';
   showToast(`تم إضافة ${count} عميل ✓${dups ? ` (تخطينا ${dups} مكرر)` : ''}`);
+  renderEntryLeads();
 }
 
 function deHandleExcelFile(evt){
@@ -1390,6 +1445,7 @@ async function deImportRowsToLeads(rows){
     تم استيراد ${added} عميل بنجاح ✓ ${skipped ? `(تخطينا ${skipped} صف ناقص بيانات)` : ''} ${dups ? `(تخطينا ${dups} رقم مكرر)` : ''}
   </div>`;
   showToast(`تم استيراد ${added} عميل من الإكسل ✓`);
+  renderEntryLeads();
 }
 
 async function assignLeadFromTable(leadId, repId){
@@ -1608,7 +1664,10 @@ async function refreshData(){
     const ok = await loadFullDB();
     if(!ok){ showToast('تعذر تحميل البيانات، حاول تاني'); return; }
     if(currentLeadId) closeLeadModal();
-    if(session.role==='admin') renderAdmin(); else renderRep();
+    closeEditLeadModal();
+    if(session.role==='admin') renderAdmin();
+    else if(session.role==='rep') renderRep();
+    else renderDataEntry();
     showToast('تم التحديث ✓');
   }finally{
     btn.disabled = false; btn.textContent = '🔄 تحديث';
@@ -1665,6 +1724,158 @@ async function deleteCurrentLead(){
   showToast('تم حذف العميل');
 }
 
+/* ===================== DATA ENTRY: LEADS + NOTES + EDIT ===================== */
+let dePage = 0;
+let editingLeadId = null;
+
+function switchEntryTab(tab){
+  document.querySelectorAll('#data-entry-view .tab-btn').forEach(b=>b.classList.toggle('active', b.dataset.tab===tab));
+  document.querySelectorAll('#data-entry-view .panel').forEach(p=>p.classList.remove('active'));
+  document.getElementById('de-panel-'+tab).classList.add('active');
+  if(tab==='leads') renderEntryLeads();
+  if(tab==='notes') renderEntryNotes();
+}
+
+function renderDataEntry(){
+  if(!DB.dataEntryUsers.find(u=>u.id===session.entryId)){ doLogout(); return; }
+  [renderEntryLeads, renderEntryNotes].forEach(fn=>{
+    try{ fn(); }catch(e){ console.error(fn.name, e); }
+  });
+}
+
+function entrySearchChanged(){ dePage = 0; renderEntryLeads(); }
+function deGoto(p){ dePage = p; renderEntryLeads(); }
+
+function renderEntryLeads(){
+  const wrap = document.getElementById('de-leads-wrap');
+  if(!wrap) return;
+  let leads = DB.leads.slice().sort((a,b)=>b.createdAt-a.createdAt);
+  const q = (document.getElementById('de-search').value||'').trim().toLowerCase();
+  if(q){
+    const qd = normPhone(q);
+    leads = leads.filter(l=> (l.name||'').toLowerCase().includes(q) || (l.phone||'').includes(q)
+      || (l.note||'').toLowerCase().includes(q) || (qd && normPhone(l.phone).includes(qd)));
+  }
+  const total = leads.length;
+  const pages = Math.max(1, Math.ceil(total/PAGE_SIZE));
+  if(dePage >= pages) dePage = pages-1;
+  leads = leads.slice(dePage*PAGE_SIZE, (dePage+1)*PAGE_SIZE);
+
+  if(leads.length===0){
+    document.getElementById('de-pager').innerHTML='';
+    wrap.innerHTML = `<div class="empty-state"><div class="icon">📇</div><div class="msg">لا يوجد عملاء</div><div class="sub">جرّب بحث تاني أو أضف عملاء من تبويب "إضافة بيانات"</div></div>`;
+    return;
+  }
+  const rows = leads.map(l=>`<tr onclick="openEditLeadModal('${l.id}')" style="cursor:pointer;">
+      <td><b>${escapeHtml(l.name)}</b></td>
+      <td class="mono">${escapeHtml(l.phone)}</td>
+      <td class="cell-note">${escapeHtml(l.note||'')}</td>
+      <td><button class="btn btn-outline btn-sm" onclick="event.stopPropagation();openEditLeadModal('${l.id}')">✏️ تعديل</button></td>
+    </tr>`).join('');
+  wrap.innerHTML = `<div style="overflow-x:auto;"><table>
+    <thead><tr><th>الاسم</th><th>الهاتف</th><th>ملاحظات</th><th></th></tr></thead>
+    <tbody>${rows}</tbody>
+  </table></div>`;
+  renderPager('de-pager', dePage, pages, total, 'deGoto');
+}
+
+function renderEntryNotes(){
+  const wrap = document.getElementById('de-notes-list');
+  const filterSel = document.getElementById('de-notes-filter-rep');
+  if(!wrap || !filterSel) return;
+  const currentVal = filterSel.value || 'all';
+  filterSel.innerHTML = '<option value="all">كل المناديب</option>' +
+    DB.reps.map(r=>`<option value="${r.id}">${escapeHtml(r.name)}</option>`).join('');
+  filterSel.value = currentVal;
+
+  let items = [];
+  DB.leads.forEach(l=>{
+    l.history.forEach(h=>{
+      if(h.type==='rep'){
+        const rp = DB.reps.find(r=>r.name===h.repName);
+        items.push({ leadId:l.id, leadName:l.name, repName:h.repName, repId: rp?rp.id:null, text:h.text, at:h.at });
+      }
+    });
+  });
+  if(filterSel.value !== 'all') items = items.filter(it=>it.repId===filterSel.value);
+  items.sort((a,b)=>b.at-a.at);
+  items = items.slice(0,100);
+
+  if(items.length===0){
+    wrap.innerHTML = `<div class="empty-state"><div class="icon">📝</div><div class="msg">لسه مفيش ملاحظات من المناديب</div></div>`;
+    return;
+  }
+  wrap.innerHTML = items.map(it=>`
+    <div class="history-item" style="cursor:pointer;" onclick="openEditLeadModal('${it.leadId}')">
+      <div class="h-top"><span><b>${escapeHtml(it.repName||'')}</b> — ${escapeHtml(it.leadName)}</span><span>${new Date(it.at).toLocaleString('ar-EG')}</span></div>
+      <div class="h-text">${escapeHtml(it.text)}</div>
+    </div>
+  `).join('');
+}
+
+function openEditLeadModal(leadId){
+  const lead = DB.leads.find(l=>l.id===leadId);
+  if(!lead) return;
+  editingLeadId = leadId;
+  document.getElementById('edit-name').value = lead.name || '';
+  document.getElementById('edit-phone').value = lead.phone || '';
+  document.getElementById('edit-note').value = lead.note || '';
+  const repNotes = lead.history.filter(h=>h.type==='rep').sort((a,b)=>b.at-a.at);
+  document.getElementById('edit-rep-notes').innerHTML = repNotes.length ? `
+    <label style="font-size:12.5px;font-weight:700;color:#8a8168;display:block;margin-bottom:6px;">ملاحظات المناديب على العميل</label>
+    <div class="history-list">` + repNotes.map(h=>`
+      <div class="history-item">
+        <div class="h-top"><span>${escapeHtml(h.repName||'')}</span><span>${new Date(h.at).toLocaleString('ar-EG')}</span></div>
+        <div class="h-text">${escapeHtml(h.text)}</div>
+      </div>`).join('') + `</div>` : '';
+  document.getElementById('edit-lead-modal').classList.add('active');
+}
+
+function closeEditLeadModal(){
+  const m = document.getElementById('edit-lead-modal');
+  if(m) m.classList.remove('active');
+  editingLeadId = null;
+}
+
+async function saveLeadEdit(){
+  const lead = DB.leads.find(l=>l.id===editingLeadId);
+  if(!lead) return;
+  const name = document.getElementById('edit-name').value.trim();
+  const phone = document.getElementById('edit-phone').value.trim();
+  const note = document.getElementById('edit-note').value.trim();
+  if(!name || !phone){ showToast('الاسم والهاتف مطلوبين'); return; }
+
+  const np = normPhone(phone);
+  const dup = np && DB.leads.find(l=>l.id!==lead.id && normPhone(l.phone)===np);
+  if(dup){ alert('⚠️ الرقم ده موجود بالفعل باسم: ' + dup.name); return; }
+
+  const changes = [];
+  if(name !== (lead.name||'')) changes.push('الاسم');
+  if(phone !== (lead.phone||'')) changes.push('الهاتف');
+  if(note !== (lead.note||'')) changes.push('الملاحظة');
+  if(changes.length===0){ closeEditLeadModal(); showToast('مفيش تغييرات'); return; }
+
+  const old = { name: lead.name, phone: lead.phone, note: lead.note };
+  const eu = DB.dataEntryUsers.find(u=>u.id===session.entryId);
+  lead.name = name; lead.phone = phone; lead.note = note;
+  lead.history.unshift({ type:'system', text:`تم تعديل بيانات العميل (${changes.join('، ')}) بواسطة ${eu ? eu.name : 'مدخل البيانات'}`, at: Date.now() });
+
+  const btn = document.getElementById('edit-save-btn');
+  btn.disabled = true;
+  const ok = await saveDBNow();
+  btn.disabled = false;
+  if(!ok){
+    lead.name = old.name; lead.phone = old.phone; lead.note = old.note;
+    lead.history.shift();
+    showToast('تعذر حفظ التعديل، تحقق من الإنترنت وحاول تاني');
+    return;
+  }
+  closeEditLeadModal();
+  renderEntryLeads();
+  renderEntryNotes();
+  showToast('تم حفظ التعديلات ✓');
+}
+
 /* ===================== UTIL ===================== */
 function escapeHtml(str){
   return (str||'').toString()
@@ -1674,6 +1885,9 @@ function escapeHtml(str){
 
 document.getElementById('lead-modal').addEventListener('click', (e)=>{
   if(e.target.id==='lead-modal') closeLeadModal();
+});
+document.getElementById('edit-lead-modal').addEventListener('click', (e)=>{
+  if(e.target.id==='edit-lead-modal') closeEditLeadModal();
 });
 
 /* ===================== INIT ===================== */
