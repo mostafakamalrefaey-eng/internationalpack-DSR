@@ -295,6 +295,12 @@
   .topbar-right{flex-wrap:wrap;gap:8px;}
   @media(max-width:640px){ .topbar{padding:12px 14px;} .container{padding:16px;} }
   .cell-note{max-width:260px;word-break:break-word;color:#6b6350;font-size:12.5px;}
+  .bar-track{height:14px;background:var(--sand-2);border-radius:99px;overflow:hidden;}
+  .bar-fill{height:100%;background:linear-gradient(90deg,var(--teal),var(--gold));border-radius:99px;transition:width .5s;min-width:0;}
+  .bar-row{display:grid;grid-template-columns:minmax(90px,150px) 1fr auto;gap:12px;align-items:center;margin-bottom:12px;font-size:13.5px;}
+  .bar-row .bar-name{font-weight:700;}
+  .bar-row .bar-val{font-family:'IBM Plex Mono',monospace;font-size:12.5px;color:#6b6350;white-space:nowrap;}
+  .bar-row.muted .bar-fill{background:#CFC6B0;}
 </style>
 </head>
 <body>
@@ -331,7 +337,7 @@
     <div class="app-credit">
       <div class="app-credit-name">DSR</div>
       <div class="app-credit-by">Edit By Mostafa Refaey</div>
-      <div class="app-credit-by" style="margin-top:2px;">النسخة: v13</div>
+      <div class="app-credit-by" style="margin-top:2px;">النسخة: v14</div>
     </div>
   </div>
 </div>
@@ -477,6 +483,11 @@
           <h3>مدخلو البيانات الحاليين</h3>
           <div id="entry-users-list"></div>
         </div>
+        <div class="card">
+          <h3>عدد العملاء المُدخلين لكل موظف</h3>
+          <div class="sub">بيتحسب من وقت تفعيل التتبع. العملاء اللي اتضافوا قبل كده بيظهروا "قبل تفعيل التتبع"</div>
+          <div id="entry-stats-chart"></div>
+        </div>
       </div>
 
       <!-- Reps' notes -->
@@ -537,6 +548,17 @@
 
     <!-- ===== DATA ENTRY VIEW ===== -->
     <div id="data-entry-view" class="hidden">
+      <div class="stat-row">
+        <div class="stat"><div class="num" id="de-stat-total">0</div><div class="lbl">إجمالي العملاء في النظام</div></div>
+        <div class="stat teal"><div class="num" id="de-stat-mine">0</div><div class="lbl" id="de-stat-mine-lbl">أضفتهم أنت</div></div>
+        <div class="stat"><div class="num" id="de-stat-today">0</div><div class="lbl">أضفتهم النهارده</div></div>
+      </div>
+      <div class="card" style="padding:16px 18px;">
+        <div style="display:flex;justify-content:space-between;font-size:13px;font-weight:700;margin-bottom:8px;">
+          <span id="de-share-label">نسبة ما أدخلته من الإجمالي</span><span class="mono" id="de-share-pct">0%</span>
+        </div>
+        <div class="bar-track"><div class="bar-fill" id="de-share-fill" style="width:0%"></div></div>
+      </div>
       <div class="tabs">
         <button class="tab-btn active" onclick="switchEntryTab('add')" data-tab="add">إضافة بيانات</button>
         <button class="tab-btn" onclick="switchEntryTab('leads')" data-tab="leads">العملاء (بحث وتعديل)</button>
@@ -956,7 +978,7 @@ function renderAdmin(){
     filterRep.value = currentVal || 'all';
   }catch(e){ console.error(e); }
 
-  [renderAdminLeadsTable, renderRepsList, renderEntryUsersList, renderNotesPanel].forEach(fn=>{
+  [renderAdminLeadsTable, renderRepsList, renderEntryUsersList, renderEntryStatsAdmin, renderNotesPanel].forEach(fn=>{
     try{ fn(); }catch(e){ console.error(fn.name, e); }
   });
 }
@@ -1263,15 +1285,28 @@ async function importRowsToLeads(rows){
   renderAdmin();
 }
 
+function currentCreator(){
+  if(!session) return null;
+  if(session.role==='data_entry'){
+    const u = DB.dataEntryUsers.find(x=>x.id===session.entryId);
+    return { id: session.entryId, name: u ? u.name : 'مدخل بيانات' };
+  }
+  if(session.role==='admin') return { id:'admin', name:'المدير' };
+  return null;
+}
+
 function newLead(name, phone, note){
-  return {
+  const by = currentCreator();
+  const lead = {
     id: uid('lead'),
     name, phone, note,
     repId: null,
     status: 'جديد',
     createdAt: Date.now(),
-    history: [{ type:'system', text:'تمت إضافة العميل للنظام', at: Date.now() }]
+    history: [{ type:'system', text: 'تمت إضافة العميل للنظام' + ((by && by.id!=='admin') ? ' بواسطة ' + by.name : ''), at: Date.now() }]
   };
+  if(by){ lead.createdBy = by.id; lead.createdByName = by.name; }
+  return lead;
 }
 
 /* ===================== ADMIN: REPS ===================== */
@@ -1361,6 +1396,7 @@ async function deAddSingleLead(){
   document.getElementById('de-add-note').value='';
   showToast('تم إضافة العميل ✓');
   renderEntryLeads();
+  renderEntryStats();
 }
 
 async function deAddBulkLeads(){
@@ -1388,6 +1424,7 @@ async function deAddBulkLeads(){
   document.getElementById('de-bulk-input').value='';
   showToast(`تم إضافة ${count} عميل ✓${dups ? ` (تخطينا ${dups} مكرر)` : ''}`);
   renderEntryLeads();
+  renderEntryStats();
 }
 
 function deHandleExcelFile(evt){
@@ -1446,6 +1483,7 @@ async function deImportRowsToLeads(rows){
   </div>`;
   showToast(`تم استيراد ${added} عميل من الإكسل ✓`);
   renderEntryLeads();
+  renderEntryStats();
 }
 
 async function assignLeadFromTable(leadId, repId){
@@ -1738,9 +1776,60 @@ function switchEntryTab(tab){
 
 function renderDataEntry(){
   if(!DB.dataEntryUsers.find(u=>u.id===session.entryId)){ doLogout(); return; }
-  [renderEntryLeads, renderEntryNotes].forEach(fn=>{
+  [renderEntryStats, renderEntryLeads, renderEntryNotes].forEach(fn=>{
     try{ fn(); }catch(e){ console.error(fn.name, e); }
   });
+}
+
+function renderEntryStats(){
+  if(!session || session.role!=='data_entry') return;
+  const eu = DB.dataEntryUsers.find(u=>u.id===session.entryId);
+  const name = eu ? eu.name : 'مدخل البيانات';
+  const total = DB.leads.length;
+  const mine = DB.leads.filter(l=>l.createdBy===session.entryId);
+  const start = new Date(); start.setHours(0,0,0,0);
+  const today = mine.filter(l=>l.createdAt>=start.getTime()).length;
+  const pct = total ? Math.round(mine.length*1000/total)/10 : 0;
+  document.getElementById('de-stat-total').textContent = total;
+  document.getElementById('de-stat-mine').textContent = mine.length;
+  document.getElementById('de-stat-mine-lbl').textContent = 'أضافهم ' + name;
+  document.getElementById('de-stat-today').textContent = today;
+  document.getElementById('de-share-label').textContent = 'نسبة ما أدخله ' + name + ' من الإجمالي';
+  document.getElementById('de-share-pct').textContent = pct + '%';
+  document.getElementById('de-share-fill').style.width = Math.min(100, pct) + '%';
+}
+
+function renderEntryStatsAdmin(){
+  const wrap = document.getElementById('entry-stats-chart');
+  if(!wrap) return;
+  const total = DB.leads.length;
+  const groups = new Map();
+  const bump = (key, label, muted)=>{
+    const g = groups.get(key) || { label, count:0, muted:!!muted };
+    g.count++; groups.set(key, g);
+  };
+  const knownIds = new Set(DB.dataEntryUsers.map(u=>u.id));
+  DB.dataEntryUsers.forEach(u=> groups.set(u.id, { label:u.name, count:0, muted:false }));
+  DB.leads.forEach(l=>{
+    if(!l.createdBy) bump('legacy','قبل تفعيل التتبع', true);
+    else if(l.createdBy==='admin') bump('admin','المدير', false);
+    else if(knownIds.has(l.createdBy)) bump(l.createdBy, '', false);
+    else bump(l.createdBy, (l.createdByName||'موظف') + ' (محذوف)', true);
+  });
+  const rows = Array.from(groups.values()).sort((a,b)=>b.count-a.count);
+  if(total===0){
+    wrap.innerHTML = `<div class="empty-state"><div class="icon">📊</div><div class="msg">لسه مفيش عملاء</div></div>`;
+    return;
+  }
+  wrap.innerHTML = `<div style="font-size:13px;font-weight:700;margin-bottom:14px;color:#6b6350;">إجمالي العملاء: <span class="mono">${total}</span></div>` +
+    rows.map(g=>{
+      const pct = Math.round(g.count*1000/total)/10;
+      return `<div class="bar-row ${g.muted?'muted':''}">
+        <div class="bar-name">${escapeHtml(g.label)}</div>
+        <div class="bar-track"><div class="bar-fill" style="width:${pct}%"></div></div>
+        <div class="bar-val">${g.count} (${pct}%)</div>
+      </div>`;
+    }).join('');
 }
 
 function entrySearchChanged(){ dePage = 0; renderEntryLeads(); }
